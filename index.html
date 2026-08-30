@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>Attendance</title>
+<title>Отметка присутствия</title>
 <style>
 :root{
   --bg:#f4f5f7; --card:#fff; --ink:#16181d; --muted:#6b7280; --line:#e3e5ea;
@@ -32,7 +32,7 @@ input,textarea,select,button{font:inherit;width:100%;border-radius:10px}
 input,textarea,select{padding:13px 14px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
 input:focus,textarea:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 textarea{min-height:120px;resize:vertical}
-/* everything is thumb-sized: this is used one-handed, standing up */
+/* всё крупное: страницу открывают с телефона, одной рукой */
 button{min-height:52px;padding:14px 16px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:650;cursor:pointer}
 button.secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}
 button[disabled]{opacity:.5;cursor:not-allowed}
@@ -63,10 +63,10 @@ ul.people button{width:auto;min-height:36px;padding:6px 12px;font-size:.82rem}
 <main id="app"></main>
 
 <script>
-/* ══ 1. PUT YOUR TWO SUPABASE VALUES HERE ═══════════════════════════════
-   Settings → API in your Supabase project.
-   The anon key is meant to be public — it is safe in this file, because the
-   database rules above are what actually protect the data.               */
+/* ══ 1. ВСТАВЬТЕ СЮДА ДВА ЗНАЧЕНИЯ ИЗ SUPABASE ══════════════════════════
+   Settings → API в вашем проекте Supabase.
+   Ключ anon и должен быть публичным — держать его в этом файле безопасно,
+   данные защищают правила в самой базе, а не скрытность ключа.          */
 const SUPABASE_URL = "https://dnfrdlcxqwagwnqglxcz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuZnJkbGN4cXdhZ3ducWdseGN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxMDU2ODMsImV4cCI6MjEwMzY4MTY4M30.paDQoVTsQcQRUbwdRHKSLcKAwVwlA5_3b65-KAwrM5s";
 /* ══════════════════════════════════════════════════════════════════════ */
@@ -75,9 +75,9 @@ const app = document.getElementById("app");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-/* A per-browser id. It is how "one check-in per device" is enforced.
-   Someone who clears their storage gets a new one — that is the known
-   weak spot, and why the rotating code carries most of the weight. */
+/* Идентификатор браузера. Именно он даёт правило «одна отметка с телефона».
+   Тот, кто очистит хранилище, получит новый — это известное слабое место,
+   поэтому основную нагрузку несёт меняющийся код. */
 function deviceId() {
   try {
     let d = localStorage.getItem("attendance.device");
@@ -100,11 +100,11 @@ async function rpc(fn, args) {
     body: JSON.stringify(args)
   });
   const data = await r.json().catch(() => null);
-  if (!r.ok) throw new Error((data && (data.message || data.hint)) || "Could not reach the database.");
+  if (!r.ok) throw new Error((data && (data.message || data.hint)) || "Не удалось связаться с базой.");
   return data || {};
 }
 
-/* remembered admin links, so you can reopen a session from this browser */
+/* сохранённые ссылки администратора, чтобы вернуться к своей отметке */
 const readSaved = () => { try { return JSON.parse(localStorage.getItem("attendance.sessions")) || []; } catch { return []; } };
 function save(entry) {
   const all = readSaved().filter(s => s.id !== entry.id);
@@ -112,7 +112,7 @@ function save(entry) {
   try { localStorage.setItem("attendance.sessions", JSON.stringify(all.slice(0, 10))); } catch {}
 }
 
-/* ── routing: #/j/<id> is the classmate link, #/a/<id>/<key> is yours ── */
+/* ── адреса: #/j/<id> — для одногруппников, #/a/<id>/<key> — для вас ── */
 function route() {
   const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   if (parts[0] === "j" && parts[1]) return { view: "checkin", id: parts[1] };
@@ -132,46 +132,46 @@ function render() {
   viewCreate();
 }
 
-/* ── not configured yet ─────────────────────────────────────────────── */
+/* ── ключи ещё не вставлены ─────────────────────────────────────────── */
 function viewSetup() {
   app.innerHTML = `<div class="card">
-    <h1>Almost ready</h1>
-    <p>Open <code>index.html</code> and replace <code>SUPABASE_URL</code> and
-       <code>SUPABASE_ANON_KEY</code> near the top of the script with the two values
-       from your Supabase project (Settings → API). Then reload this page.</p>
-    <p class="muted">If you have not run the SQL setup in Supabase yet, do that first —
-       nothing works without the tables and functions.</p>
+    <h1>Почти готово</h1>
+    <p>Откройте <code>index.html</code> и замените <code>SUPABASE_URL</code> и
+       <code>SUPABASE_ANON_KEY</code> в начале скрипта на значения из вашего проекта
+       Supabase (Settings → API). Затем обновите эту страницу.</p>
+    <p class="muted">Если вы ещё не выполнили SQL-настройку в Supabase, начните с неё —
+       без таблиц и функций ничего работать не будет.</p>
   </div>`;
 }
 
-/* ── create a session ───────────────────────────────────────────────── */
+/* ── создание отметки ───────────────────────────────────────────────── */
 function viewCreate() {
   const saved = readSaved();
   app.innerHTML = `
   <div class="card">
-    <h1>New attendance session</h1>
-    <p class="muted">Takes ten seconds. You get a link to send and a code to show.</p>
+    <h1>Новая отметка присутствия</h1>
+    <p class="muted">Займёт десять секунд. Вы получите ссылку для чата и код для экрана.</p>
     <form id="f" autocomplete="off">
-      <label for="title">What is this for?</label>
-      <input id="title" type="text" placeholder="Maths, Monday 9:00" required>
+      <label for="title">Что отмечаем?</label>
+      <input id="title" type="text" placeholder="Математика, понедельник 9:00" required>
 
-      <label for="roster">Class list <span class="muted">(one name per line — optional)</span></label>
-      <textarea id="roster" placeholder="Alex Ivanov&#10;Maria Petrova&#10;Sam Cohen"></textarea>
-      <p class="muted">With a list, people tap their own name and nobody can invent one.
-         Leave it empty to let people type their names.</p>
+      <label for="roster">Список группы <span class="muted">(по одному имени в строке — необязательно)</span></label>
+      <textarea id="roster" placeholder="Алексей Иванов&#10;Мария Петрова&#10;Дмитрий Волков"></textarea>
+      <p class="muted">Со списком каждый нажимает своё имя и придумать новое невозможно.
+         Оставьте поле пустым, чтобы имена вводили вручную.</p>
 
       <label style="display:flex;gap:10px;align-items:center;margin-top:16px">
         <input id="needcode" type="checkbox" checked style="width:22px;height:22px;flex:0 0 auto">
-        <span>Require the rotating code shown on my screen</span>
+        <span>Требовать код, который меняется у меня на экране</span>
       </label>
 
-      <button type="submit" style="margin-top:18px">Create session</button>
+      <button type="submit" style="margin-top:18px">Создать</button>
       <div id="msg" class="msg bad" hidden></div>
     </form>
   </div>
-  ${saved.length ? `<div class="card"><h2>Your earlier sessions</h2>${
+  ${saved.length ? `<div class="card"><h2>Ваши прошлые отметки</h2>${
     saved.map(s => `<button class="secondary" style="margin-bottom:8px"
-      data-go="#/a/${esc(s.id)}/${esc(s.key)}">${esc(s.title)} · ${esc(new Date(s.at).toLocaleString())}</button>`).join("")
+      data-go="#/a/${esc(s.id)}/${esc(s.key)}">${esc(s.title)} · ${esc(new Date(s.at).toLocaleString("ru-RU"))}</button>`).join("")
   }</div>` : ""}`;
 
   app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { location.hash = b.dataset.go; });
@@ -182,7 +182,8 @@ function viewCreate() {
     const seen = new Set(), roster = [];
     for (const line of app.querySelector("#roster").value.split("\n")) {
       const name = line.trim().replace(/\s+/g, " ").slice(0, 60);
-      const key = name.toLowerCase().replace(/[^a-z0-9\u0400-\u04ff]+/g, "");
+      // ё и е — одна буква, как и в базе
+      const key = name.toLowerCase().replace(/ё/g, "е").replace(/[^a-z0-9\u0400-\u04ff]+/g, "");
       if (name && key && !seen.has(key)) { seen.add(key); roster.push(name); }
     }
     const msg = app.querySelector("#msg");
@@ -191,7 +192,7 @@ function viewCreate() {
         p_title: title, p_roster: roster, p_require_code: app.querySelector("#needcode").checked
       });
       if (out.error) throw new Error(out.error);
-      save({ id: out.id, key: out.admin_key, title: title || "Attendance", at: Date.now() });
+      save({ id: out.id, key: out.admin_key, title: title || "Присутствие", at: Date.now() });
       location.hash = "#/a/" + out.id + "/" + out.admin_key;
     } catch (err) {
       msg.textContent = err.message;
@@ -200,35 +201,35 @@ function viewCreate() {
   };
 }
 
-/* ── your dashboard ─────────────────────────────────────────────────── */
+/* ── ваша панель ────────────────────────────────────────────────────── */
 function viewAdmin(id, key) {
   app.innerHTML = `
   <div class="card">
-    <h1 id="t">Loading…</h1>
+    <h1 id="t">Загрузка…</h1>
     <p class="muted" id="count"></p>
     <div class="row">
-      <button class="secondary" id="toggle">Close check-in</button>
-      <button class="secondary" id="csv">Export CSV</button>
+      <button class="secondary" id="toggle">Закрыть</button>
+      <button class="secondary" id="csv">Скачать CSV</button>
     </div>
   </div>
   <div class="card" id="codeCard" hidden>
-    <h2>Show this code to the room</h2>
+    <h2>Покажите этот код аудитории</h2>
     <div class="code" id="code">••••</div>
     <div class="bar"><i id="bar" style="width:100%"></i></div>
-    <p class="muted" style="margin-top:10px">It changes every 30 seconds. Someone who is not
-       in the room cannot check in, even if they have the link.</p>
+    <p class="muted" style="margin-top:10px">Код меняется каждые 30 секунд. Тот, кого нет
+       в аудитории, отметиться не сможет, даже если у него есть ссылка.</p>
   </div>
   <div class="card">
-    <h2>Link to send in the chat</h2>
+    <h2>Ссылка для чата</h2>
     <div class="link" id="link"></div>
-    <button class="secondary" id="copy">Copy link</button>
+    <button class="secondary" id="copy">Скопировать ссылку</button>
   </div>
-  <div class="card"><h2 id="ph">Present</h2><ul class="people" id="list"></ul></div>
-  <div class="card" id="missCard" hidden><h2>Not yet here</h2><div id="miss"></div></div>
+  <div class="card"><h2 id="ph">Отметились</h2><ul class="people" id="list"></ul></div>
+  <div class="card" id="missCard" hidden><h2>Ещё не отметились</h2><div id="miss"></div></div>
   <div class="card">
-    <p class="muted">Keep this page's address private — it is the only way back into this
-       session, and anyone holding it can edit the list.</p>
-    <button class="secondary" id="new">Start another session</button>
+    <p class="muted">Не показывайте адрес этой страницы: это единственный вход в вашу
+       отметку, и любой, у кого он есть, сможет менять список.</p>
+    <button class="secondary" id="new">Создать новую отметку</button>
   </div>`;
 
   const $ = s => app.querySelector(s);
@@ -237,9 +238,9 @@ function viewAdmin(id, key) {
   $("#new").onclick = () => { location.hash = ""; };
   $("#csv").onclick = () => exportCsv(id, key);
   $("#copy").onclick = async () => {
-    try { await navigator.clipboard.writeText(joinLink); $("#copy").textContent = "Copied"; }
-    catch { $("#copy").textContent = "Select the link above and copy it"; }
-    setTimeout(() => ($("#copy").textContent = "Copy link"), 1800);
+    try { await navigator.clipboard.writeText(joinLink); $("#copy").textContent = "Скопировано"; }
+    catch { $("#copy").textContent = "Выделите ссылку выше и скопируйте"; }
+    setTimeout(() => ($("#copy").textContent = "Скопировать ссылку"), 1800);
   };
 
   let left = 30, open = true;
@@ -254,9 +255,10 @@ function viewAdmin(id, key) {
     const n = d.attendees.length;
     $("#t").textContent = d.title;
     $("#count").textContent =
-      (d.roster_size ? n + " of " + d.roster_size + " present" : n + " present") + (open ? "" : " · closed");
-    $("#ph").textContent = "Present (" + n + ")";
-    $("#toggle").textContent = open ? "Close check-in" : "Reopen check-in";
+      (d.roster_size ? "Отметились: " + n + " из " + d.roster_size : "Отметились: " + n)
+      + (open ? "" : " · закрыто");
+    $("#ph").textContent = "Отметились (" + n + ")";
+    $("#toggle").textContent = open ? "Закрыть" : "Открыть снова";
     $("#codeCard").hidden = !d.require_code || !open;
     $("#code").textContent = d.code;
     left = d.seconds_left;
@@ -264,13 +266,13 @@ function viewAdmin(id, key) {
     $("#list").innerHTML = n
       ? d.attendees.map(a => `<li><span>${esc(a.name)}</span>
           <span style="display:flex;gap:10px;align-items:center">
-            <span class="when">${esc(new Date(a.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}</span>
-            <button class="secondary" data-rm="${esc(a.name)}">Remove</button>
+            <span class="when">${esc(new Date(a.at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }))}</span>
+            <button class="secondary" data-rm="${esc(a.name)}">Убрать</button>
           </span></li>`).join("")
-      : `<li class="muted">Nobody yet.</li>`;
+      : `<li class="muted">Пока никого.</li>`;
 
     $("#list").querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => {
-      if (!confirm("Remove " + b.dataset.rm + " from the list?")) return;
+      if (!confirm("Убрать из списка: " + b.dataset.rm + "?")) return;
       await rpc("remove_attendee", { p_session: id, p_key: key, p_name: b.dataset.rm });
       refresh();
     });
@@ -285,7 +287,7 @@ function viewAdmin(id, key) {
   };
 
   refresh();
-  timers.push(setInterval(refresh, 3000));
+  timers.push(setInterval(refresh, 6000));
   timers.push(setInterval(() => {
     left = Math.max(0, left - 1);
     const bar = $("#bar");
@@ -296,57 +298,57 @@ function viewAdmin(id, key) {
 async function exportCsv(id, key) {
   const d = await rpc("admin_view", { p_session: id, p_key: key });
   if (d.error) return alert(d.error);
-  const rows = [["name", "checked_in_at"]].concat(
-    d.attendees.map(a => [a.name, new Date(a.at).toLocaleString()]));
+  const rows = [["Имя", "Время отметки"]].concat(
+    d.attendees.map(a => [a.name, new Date(a.at).toLocaleString("ru-RU")]));
   const csv = "\uFEFF" + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = "attendance-" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.download = "prisutstvie-" + new Date().toISOString().slice(0, 10) + ".csv";
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-/* ── what a classmate opens ─────────────────────────────────────────── */
+/* ── что открывает одногруппник ─────────────────────────────────────── */
 async function viewCheckin(id) {
-  app.innerHTML = `<div class="card"><h1 id="t">Loading…</h1><p class="muted" id="s">One moment.</p></div>`;
+  app.innerHTML = `<div class="card"><h1 id="t">Загрузка…</h1><p class="muted" id="s">Секунду.</p></div>`;
   const $ = s => app.querySelector(s);
   const device = deviceId();
 
   let state;
   try { state = await rpc("public_session", { p_session: id, p_device: device }); }
-  catch { $("#t").textContent = "No connection"; $("#s").textContent = "Check your internet and reload."; return; }
+  catch { $("#t").textContent = "Нет связи"; $("#s").textContent = "Проверьте интернет и обновите страницу."; return; }
 
-  if (state.error) { $("#t").textContent = "Link not valid"; $("#s").textContent = state.error; return; }
+  if (state.error) { $("#t").textContent = "Ссылка не работает"; $("#s").textContent = state.error; return; }
 
   const done = name => {
-    app.innerHTML = `<div class="card"><h1>You're marked present</h1>
-      <p class="muted">Recorded as <strong>${esc(name)}</strong>.</p></div>`;
+    app.innerHTML = `<div class="card"><h1>Вы отмечены</h1>
+      <p class="muted">Записано как <strong>${esc(name)}</strong>.</p></div>`;
   };
   if (state.already) return done(state.already);
 
   $("#t").textContent = state.title;
-  if (!state.is_open) { $("#s").textContent = "Check-in is closed for this session."; return; }
+  if (!state.is_open) { $("#s").textContent = "Отметка закрыта."; return; }
 
   const hasRoster = state.roster.length > 0;
   $("#s").textContent = hasRoster
-    ? "Tap your name, type the code on the screen, and confirm."
-    : "Enter your name and the code shown on the screen.";
+    ? "Нажмите своё имя, введите код с экрана и подтвердите."
+    : "Введите своё имя и код с экрана.";
 
   app.insertAdjacentHTML("beforeend", `
   <form class="card" id="f" autocomplete="off">
     ${hasRoster ? `
-      <label for="filter">Find your name</label>
-      <input id="filter" type="search" placeholder="Start typing…">
+      <label for="filter">Найдите своё имя</label>
+      <input id="filter" type="search" placeholder="Начните вводить…">
       <div class="namelist" id="names"></div>` : `
-      <label for="free">Your full name</label>
-      <input id="free" type="text" autocomplete="name" placeholder="e.g. Alex Ivanov">`}
+      <label for="free">Имя и фамилия</label>
+      <input id="free" type="text" autocomplete="name" placeholder="например, Алексей Иванов">`}
     ${state.require_code ? `
-      <label for="code">Code on the screen</label>
+      <label for="code">Код с экрана</label>
       <input id="code" class="pin" type="text" inputmode="numeric" pattern="[0-9]*"
              maxlength="4" placeholder="0000" autocomplete="one-time-code">
-      <p class="muted">It changes every 30 seconds, so you have to be in the room to read it.</p>` : ""}
-    <button id="go" type="submit">I'm here</button>
+      <p class="muted">Он меняется каждые 30 секунд — прочитать его можно только в аудитории.</p>` : ""}
+    <button id="go" type="submit">Я здесь</button>
     <div id="msg" class="msg bad" hidden></div>
   </form>`);
 
@@ -361,7 +363,7 @@ async function viewCheckin(id) {
           class="${taken.has(n.toLowerCase()) ? "gone" : ""}"
           ${taken.has(n.toLowerCase()) ? "disabled" : ""}
           style="${n === picked ? "border-color:var(--accent)" : ""}">${esc(n)}</button>`).join("")
-      : `<p class="muted">No name matches that.</p>`;
+      : `<p class="muted">Ничего не найдено.</p>`;
     $("#names").querySelectorAll("[data-n]").forEach(b => b.onclick = () => {
       picked = b.dataset.n;
       drawNames();
@@ -375,25 +377,25 @@ async function viewCheckin(id) {
   $("#f").onsubmit = async e => {
     e.preventDefault();
     const name = hasRoster ? picked : $("#free").value.trim();
-    if (!name) return say("Please choose your name first.");
+    if (!name) return say("Сначала выберите своё имя.");
     const code = $("#code") ? $("#code").value.trim() : "";
-    if (state.require_code && code.length !== 4) return say("Enter the 4-digit code from the screen.");
+    if (state.require_code && code.length !== 4) return say("Введите код из 4 цифр с экрана.");
 
     $("#go").disabled = true;
     $("#msg").hidden = true;
     try {
       const out = await rpc("check_in", { p_session: id, p_name: name, p_code: code, p_device: device });
       if (out.ok) return done(out.name);
-      say(out.error || "Something went wrong. Try again.");
-      // Only strike the name out when it is genuinely taken; a wrong
-      // code must leave the choice intact.
-      if (hasRoster && /already been marked/.test(out.error || "")) {
+      say(out.error || "Что-то пошло не так. Попробуйте ещё раз.");
+      // Зачёркиваем имя только если оно действительно занято;
+      // при неверном коде выбор должен остаться.
+      if (hasRoster && /уже в списке/.test(out.error || "")) {
         taken.add(name.toLowerCase());
         picked = null;
         drawNames();
       }
     } catch {
-      say("No connection. Try again.");
+      say("Нет связи. Попробуйте ещё раз.");
     } finally {
       $("#go").disabled = false;
     }
