@@ -1,267 +1,407 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<title>Roll Call</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Attendance</title>
 <style>
+:root{
+  --bg:#f4f5f7; --card:#fff; --ink:#16181d; --muted:#6b7280; --line:#e3e5ea;
+  --accent:#2f6df6; --accent-ink:#fff; --ok:#15803d; --ok-bg:#e7f6ec;
+  --bad:#b42318; --bad-bg:#fdeceb; --radius:14px;
+}
+@media (prefers-color-scheme:dark){
   :root{
-    --ink:#1C2333; --ink-soft:#2A3247; --paper:#F7F3EA; --paper-dim:#EDE7D8;
-    --text:#232323; --text-dim:#6b6558; --stamp:#B33F3F; --line:#d9d2bf;
+    --bg:#101216; --card:#191c22; --ink:#eceef2; --muted:#99a0ad; --line:#2a2e37;
+    --accent:#5b8dff; --accent-ink:#0b1020; --ok:#6ee7a0; --ok-bg:#10261a;
+    --bad:#ff9b93; --bad-bg:#2b1513;
   }
-  *{box-sizing:border-box;}
-  @media (prefers-reduced-motion: reduce){ *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;} }
-  html,body{margin:0;padding:0;background:var(--ink);}
-  body{font-family:'Inter',sans-serif;color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 0 60px;}
-  .sheet{width:100%;max-width:560px;background:var(--paper);min-height:100vh;box-shadow:0 0 60px rgba(0,0,0,0.35);position:relative;}
-  header{padding:clamp(20px,5vw,32px) clamp(20px,5vw,32px) 18px;border-bottom:2px solid var(--ink);}
-  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-dim);margin:0 0 6px;}
-  h1{font-family:'Fraunces',serif;font-weight:700;font-size:clamp(28px,7vw,38px);margin:0 0 10px;letter-spacing:-0.01em;}
-  .meta-row{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;}
-  #sessionName{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);}
-  #countBadge{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;background:var(--ink);color:var(--paper);padding:4px 10px;border-radius:20px;}
-  .banner{margin:16px clamp(20px,5vw,32px) 0;padding:12px 16px;border:1.5px dashed var(--stamp);border-radius:10px;font-size:14px;color:var(--stamp);display:none;font-weight:500;}
-  .banner.show{display:block;}
-  main{padding:10px clamp(20px,5vw,32px) 40px;}
-  .empty,.loading{text-align:center;color:var(--text-dim);padding:60px 20px;font-size:14px;}
-  .loading{font-family:'JetBrains Mono',monospace;font-size:13px;}
-  ul.roster{list-style:none;margin:16px 0 0;padding:0;}
-  li.row{display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid var(--line);cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit;-webkit-tap-highlight-color:transparent;transition:background 0.15s ease;}
-  li.row:active{background:var(--paper-dim);}
-  li.row.disabled{cursor:default;}
-  li.row:focus-visible{outline:2px solid var(--ink);outline-offset:2px;}
-  .num{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);width:22px;flex-shrink:0;}
-  .name{font-family:'Fraunces',serif;font-size:18px;font-weight:500;flex:1;min-width:0;}
-  .status{flex-shrink:0;text-align:right;min-width:90px;}
-  .status .stamp-mark{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.05em;color:var(--stamp);border:2px solid var(--stamp);border-radius:4px;padding:3px 7px;transform:rotate(-6deg);text-transform:uppercase;animation:stampIn 0.25s ease-out;}
-  @keyframes stampIn{0%{transform:rotate(-6deg) scale(1.8);opacity:0;}100%{transform:rotate(-6deg) scale(1);opacity:1;}}
-  .status .time{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:3px;}
-  .status .blank{display:inline-block;width:60px;border-bottom:1.5px solid var(--line);}
-  .overlay{position:fixed;inset:0;background:rgba(20,20,20,0.55);display:none;align-items:flex-end;justify-content:center;z-index:50;}
-  .overlay.show{display:flex;}
-  @media (min-width:560px){.overlay{align-items:center;}}
-  .modal{background:var(--paper);width:100%;max-width:420px;border-radius:18px 18px 0 0;padding:26px 22px 30px;box-shadow:0 -8px 40px rgba(0,0,0,0.3);}
-  @media (min-width:560px){.modal{border-radius:16px;}}
-  .modal h2{font-family:'Fraunces',serif;font-size:22px;margin:0 0 8px;}
-  .modal p{font-size:14px;color:var(--text-dim);margin:0 0 20px;line-height:1.5;}
-  .modal-btns{display:flex;gap:10px;}
-  button.btn{font-family:'Inter',sans-serif;font-weight:600;font-size:15px;padding:13px 18px;border-radius:10px;border:none;cursor:pointer;flex:1;-webkit-tap-highlight-color:transparent;}
-  button.btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px;}
-  .btn-primary{background:var(--ink);color:var(--paper);}
-  .btn-secondary{background:transparent;color:var(--text);border:1.5px solid var(--line);}
-  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:20px;font-size:13px;z-index:80;opacity:0;transition:opacity 0.25s ease;pointer-events:none;max-width:88vw;text-align:center;}
-  .toast.show{opacity:1;}
+}
+*{box-sizing:border-box}
+body{margin:0;padding:16px;background:var(--bg);color:var(--ink);
+  font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+main{max-width:560px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px}
+h1{font-size:1.4rem;margin:0 0 4px}
+h2{font-size:1.05rem;margin:0 0 10px}
+p{margin:0 0 12px}
+.muted{color:var(--muted);font-size:.9rem}
+label{display:block;font-weight:600;font-size:.9rem;margin:14px 0 6px}
+input,textarea,select,button{font:inherit;width:100%;border-radius:10px}
+input,textarea,select{padding:13px 14px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+input:focus,textarea:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+textarea{min-height:120px;resize:vertical}
+/* everything is thumb-sized: this is used one-handed, standing up */
+button{min-height:52px;padding:14px 16px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:650;cursor:pointer}
+button.secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button[disabled]{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+.row button{padding:14px 8px;font-size:.95rem}
+.code{font:700 clamp(48px,18vw,84px)/1 ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.12em;text-align:center;margin:6px 0 2px}
+.bar{height:6px;background:var(--line);border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent);transition:width .3s linear}
+.pin{font:700 1.6rem/1 ui-monospace,Menlo,monospace;letter-spacing:.5em;text-align:center;padding-left:.5em}
+.msg{padding:13px 14px;border-radius:10px;margin:12px 0 0;font-weight:600}
+.msg.ok{background:var(--ok-bg);color:var(--ok)}
+.msg.bad{background:var(--bad-bg);color:var(--bad)}
+ul.people{list-style:none;margin:0;padding:0}
+ul.people li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)}
+ul.people li:last-child{border-bottom:0}
+ul.people .when{color:var(--muted);font-size:.82rem;white-space:nowrap}
+ul.people button{width:auto;min-height:36px;padding:6px 12px;font-size:.82rem}
+.namelist{max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.namelist button{text-align:left;background:var(--bg);color:var(--ink);border:1px solid var(--line);margin-bottom:8px}
+.namelist button.gone{opacity:.45;text-decoration:line-through}
+.link{word-break:break-all;font-family:ui-monospace,Menlo,monospace;font-size:.85rem;background:var(--bg);
+  border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-bottom:10px}
+.tag{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:3px 10px;font-size:.8rem;margin:0 6px 6px 0}
 </style>
 </head>
 <body>
-
-<div class="sheet">
-  <header>
-    <p class="eyebrow" id="dateLabel">—</p>
-    <h1>Roll Call</h1>
-    <div class="meta-row">
-      <span id="sessionName">loading session…</span>
-      <span id="countBadge">0/0</span>
-    </div>
-  </header>
-
-  <div class="banner" id="banner"></div>
-
-  <main>
-    <div id="loadingState" class="loading">Opening the ledger…</div>
-    <ul class="roster" id="rosterList" style="display:none;"></ul>
-    <div class="empty" id="emptyState" style="display:none;">No active session right now. Check back once your teacher starts one.</div>
-  </main>
-</div>
-
-<div class="overlay" id="confirmOverlay">
-  <div class="modal">
-    <h2>Stamp your attendance?</h2>
-    <p id="confirmBody"></p>
-    <div class="modal-btns">
-      <button class="btn btn-secondary" id="confirmCancel">Cancel</button>
-      <button class="btn btn-primary" id="confirmYes">Yes, that's me</button>
-    </div>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
+<main id="app"></main>
 
 <script>
-// ====== FILL THESE IN AFTER YOU CREATE YOUR SUPABASE PROJECT ======
-// Project Settings -> API -> Project URL / anon public key
-const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+/* ══ 1. PUT YOUR TWO SUPABASE VALUES HERE ═══════════════════════════════
+   Settings → API in your Supabase project.
+   The anon key is meant to be public — it is safe in this file, because the
+   database rules above are what actually protect the data.               */
+const SUPABASE_URL = "https://YOUR-PROJECT.supabase.co";
 const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
-// ====================================================================
+/* ══════════════════════════════════════════════════════════════════════ */
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const app = document.getElementById("app");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-let session = null;
-let attendance = {}; // name -> marked_at
-let deviceToken = localStorage.getItem('rollcall_device_token');
-if(!deviceToken){
-  deviceToken = crypto.randomUUID();
-  localStorage.setItem('rollcall_device_token', deviceToken);
-}
-let myMarkedName = null;
-let pendingName = null;
-
-const $ = (id) => document.getElementById(id);
-
-function toast(msg){
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2400);
-}
-function fmtTime(iso){
-  try{ return new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
-  catch(e){ return ''; }
-}
-
-async function loadSession(){
-  const { data, error } = await sb
-    .from('class_sessions')
-    .select('*')
-    .eq('is_current', true)
-    .order('created_at', {ascending:false})
-    .limit(1)
-    .maybeSingle();
-
-  if(error || !data){
-    $('loadingState').style.display = 'none';
-    $('emptyState').style.display = 'block';
-    return;
-  }
-  session = data;
-  await loadAttendance();
-  subscribeRealtime();
-  render();
-}
-
-async function loadAttendance(){
-  const { data, error } = await sb
-    .from('attendance')
-    .select('name, marked_at, device_token')
-    .eq('session_id', session.id);
-  attendance = {};
-  if(!error && data){
-    data.forEach(row => { attendance[row.name] = row.marked_at; });
-    const mine = data.find(row => row.device_token === deviceToken);
-    myMarkedName = mine ? mine.name : null;
-  }
-}
-
-function subscribeRealtime(){
-  sb.channel('attendance-' + session.id)
-    .on('postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'attendance', filter: `session_id=eq.${session.id}` },
-      (payload) => {
-        attendance[payload.new.name] = payload.new.marked_at;
-        if(payload.new.device_token === deviceToken) myMarkedName = payload.new.name;
-        render();
-      })
-    .subscribe();
-}
-
-function render(){
-  $('loadingState').style.display = 'none';
-  $('emptyState').style.display = 'none';
-  $('dateLabel').textContent = new Date().toLocaleDateString(undefined, {weekday:'long', month:'short', day:'numeric'});
-  $('sessionName').textContent = session.name;
-  $('countBadge').textContent = Object.keys(attendance).length + '/' + session.roster.length;
-
-  const banner = $('banner');
-  if(myMarkedName){
-    banner.textContent = "You're checked in as " + myMarkedName + ". Thanks!";
-    banner.classList.add('show');
-  } else {
-    banner.classList.remove('show');
-  }
-
-  const list = $('rosterList');
-  list.style.display = 'block';
-  list.innerHTML = '';
-  session.roster.forEach((name, i) => {
-    const li = document.createElement('li');
-    li.className = 'row' + (myMarkedName ? ' disabled' : '');
-    li.tabIndex = 0;
-    li.setAttribute('role', 'button');
-
-    const num = document.createElement('span');
-    num.className = 'num';
-    num.textContent = String(i+1).padStart(2,'0');
-
-    const nm = document.createElement('span');
-    nm.className = 'name';
-    nm.textContent = name;
-
-    const status = document.createElement('span');
-    status.className = 'status';
-    if(attendance[name]){
-      status.innerHTML = '<span class="stamp-mark">Present</span><span class="time">'+fmtTime(attendance[name])+'</span>';
-    } else {
-      status.innerHTML = '<span class="blank">&nbsp;</span>';
+/* A per-browser id. It is how "one check-in per device" is enforced.
+   Someone who clears their storage gets a new one — that is the known
+   weak spot, and why the rotating code carries most of the weight. */
+function deviceId() {
+  try {
+    let d = localStorage.getItem("attendance.device");
+    if (!d) {
+      d = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now());
+      localStorage.setItem("attendance.device", d);
     }
+    return d;
+  } catch { return ""; }
+}
 
-    li.appendChild(num); li.appendChild(nm); li.appendChild(status);
+async function rpc(fn, args) {
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: "Bearer " + SUPABASE_ANON_KEY,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(args)
+  });
+  const data = await r.json().catch(() => null);
+  if (!r.ok) throw new Error((data && (data.message || data.hint)) || "Could not reach the database.");
+  return data || {};
+}
 
-    if(!myMarkedName && !attendance[name]){
-      li.addEventListener('click', () => openConfirm(name));
-      li.addEventListener('keydown', (e) => { if(e.key==='Enter'||e.key===' ') openConfirm(name); });
+/* remembered admin links, so you can reopen a session from this browser */
+const readSaved = () => { try { return JSON.parse(localStorage.getItem("attendance.sessions")) || []; } catch { return []; } };
+function save(entry) {
+  const all = readSaved().filter(s => s.id !== entry.id);
+  all.unshift(entry);
+  try { localStorage.setItem("attendance.sessions", JSON.stringify(all.slice(0, 10))); } catch {}
+}
+
+/* ── routing: #/j/<id> is the classmate link, #/a/<id>/<key> is yours ── */
+function route() {
+  const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+  if (parts[0] === "j" && parts[1]) return { view: "checkin", id: parts[1] };
+  if (parts[0] === "a" && parts[1] && parts[2]) return { view: "admin", id: parts[1], key: parts[2] };
+  return { view: "create" };
+}
+
+let timers = [];
+const stopTimers = () => { timers.forEach(clearInterval); timers = []; };
+
+function render() {
+  stopTimers();
+  if (SUPABASE_URL.includes("YOUR-PROJECT")) return viewSetup();
+  const r = route();
+  if (r.view === "checkin") return viewCheckin(r.id);
+  if (r.view === "admin") return viewAdmin(r.id, r.key);
+  viewCreate();
+}
+
+/* ── not configured yet ─────────────────────────────────────────────── */
+function viewSetup() {
+  app.innerHTML = `<div class="card">
+    <h1>Almost ready</h1>
+    <p>Open <code>index.html</code> and replace <code>SUPABASE_URL</code> and
+       <code>SUPABASE_ANON_KEY</code> near the top of the script with the two values
+       from your Supabase project (Settings → API). Then reload this page.</p>
+    <p class="muted">If you have not run the SQL setup in Supabase yet, do that first —
+       nothing works without the tables and functions.</p>
+  </div>`;
+}
+
+/* ── create a session ───────────────────────────────────────────────── */
+function viewCreate() {
+  const saved = readSaved();
+  app.innerHTML = `
+  <div class="card">
+    <h1>New attendance session</h1>
+    <p class="muted">Takes ten seconds. You get a link to send and a code to show.</p>
+    <form id="f" autocomplete="off">
+      <label for="title">What is this for?</label>
+      <input id="title" type="text" placeholder="Maths, Monday 9:00" required>
+
+      <label for="roster">Class list <span class="muted">(one name per line — optional)</span></label>
+      <textarea id="roster" placeholder="Alex Ivanov&#10;Maria Petrova&#10;Sam Cohen"></textarea>
+      <p class="muted">With a list, people tap their own name and nobody can invent one.
+         Leave it empty to let people type their names.</p>
+
+      <label style="display:flex;gap:10px;align-items:center;margin-top:16px">
+        <input id="needcode" type="checkbox" checked style="width:22px;height:22px;flex:0 0 auto">
+        <span>Require the rotating code shown on my screen</span>
+      </label>
+
+      <button type="submit" style="margin-top:18px">Create session</button>
+      <div id="msg" class="msg bad" hidden></div>
+    </form>
+  </div>
+  ${saved.length ? `<div class="card"><h2>Your earlier sessions</h2>${
+    saved.map(s => `<button class="secondary" style="margin-bottom:8px"
+      data-go="#/a/${esc(s.id)}/${esc(s.key)}">${esc(s.title)} · ${esc(new Date(s.at).toLocaleString())}</button>`).join("")
+  }</div>` : ""}`;
+
+  app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { location.hash = b.dataset.go; });
+
+  app.querySelector("#f").onsubmit = async e => {
+    e.preventDefault();
+    const title = app.querySelector("#title").value.trim();
+    const seen = new Set(), roster = [];
+    for (const line of app.querySelector("#roster").value.split("\n")) {
+      const name = line.trim().replace(/\s+/g, " ").slice(0, 60);
+      const key = name.toLowerCase().replace(/[^a-z0-9\u0400-\u04ff]+/g, "");
+      if (name && key && !seen.has(key)) { seen.add(key); roster.push(name); }
     }
-    list.appendChild(li);
-  });
+    const msg = app.querySelector("#msg");
+    try {
+      const out = await rpc("create_session", {
+        p_title: title, p_roster: roster, p_require_code: app.querySelector("#needcode").checked
+      });
+      if (out.error) throw new Error(out.error);
+      save({ id: out.id, key: out.admin_key, title: title || "Attendance", at: Date.now() });
+      location.hash = "#/a/" + out.id + "/" + out.admin_key;
+    } catch (err) {
+      msg.textContent = err.message;
+      msg.hidden = false;
+    }
+  };
 }
 
-function openConfirm(name){
-  pendingName = name;
-  $('confirmBody').textContent = 'Confirm this is you: "' + name + '". You can only stamp one name per device.';
-  $('confirmOverlay').classList.add('show');
-}
-$('confirmCancel').addEventListener('click', () => {
-  $('confirmOverlay').classList.remove('show');
-  pendingName = null;
-});
-$('confirmYes').addEventListener('click', async () => {
-  $('confirmOverlay').classList.remove('show');
-  if(!pendingName) return;
-  await markPresent(pendingName);
-  pendingName = null;
-});
+/* ── your dashboard ─────────────────────────────────────────────────── */
+function viewAdmin(id, key) {
+  app.innerHTML = `
+  <div class="card">
+    <h1 id="t">Loading…</h1>
+    <p class="muted" id="count"></p>
+    <div class="row">
+      <button class="secondary" id="toggle">Close check-in</button>
+      <button class="secondary" id="csv">Export CSV</button>
+    </div>
+  </div>
+  <div class="card" id="codeCard" hidden>
+    <h2>Show this code to the room</h2>
+    <div class="code" id="code">••••</div>
+    <div class="bar"><i id="bar" style="width:100%"></i></div>
+    <p class="muted" style="margin-top:10px">It changes every 30 seconds. Someone who is not
+       in the room cannot check in, even if they have the link.</p>
+  </div>
+  <div class="card">
+    <h2>Link to send in the chat</h2>
+    <div class="link" id="link"></div>
+    <button class="secondary" id="copy">Copy link</button>
+  </div>
+  <div class="card"><h2 id="ph">Present</h2><ul class="people" id="list"></ul></div>
+  <div class="card" id="missCard" hidden><h2>Not yet here</h2><div id="miss"></div></div>
+  <div class="card">
+    <p class="muted">Keep this page's address private — it is the only way back into this
+       session, and anyone holding it can edit the list.</p>
+    <button class="secondary" id="new">Start another session</button>
+  </div>`;
 
-async function markPresent(name){
-  const { data, error } = await sb.rpc('mark_attendance', {
-    p_session_id: session.id,
-    p_name: name,
-    p_device_token: deviceToken
-  });
+  const $ = s => app.querySelector(s);
+  const joinLink = location.origin + location.pathname + "#/j/" + id;
+  $("#link").textContent = joinLink;
+  $("#new").onclick = () => { location.hash = ""; };
+  $("#csv").onclick = () => exportCsv(id, key);
+  $("#copy").onclick = async () => {
+    try { await navigator.clipboard.writeText(joinLink); $("#copy").textContent = "Copied"; }
+    catch { $("#copy").textContent = "Select the link above and copy it"; }
+    setTimeout(() => ($("#copy").textContent = "Copy link"), 1800);
+  };
 
-  if(error){
-    toast("Couldn't reach the server — check your connection and try again.");
-    return;
+  let left = 30, open = true;
+
+  async function refresh() {
+    let d;
+    try { d = await rpc("admin_view", { p_session: id, p_key: key }); }
+    catch { return; }
+    if (d.error) { stopTimers(); $("#t").textContent = d.error; return; }
+
+    open = d.is_open;
+    const n = d.attendees.length;
+    $("#t").textContent = d.title;
+    $("#count").textContent =
+      (d.roster_size ? n + " of " + d.roster_size + " present" : n + " present") + (open ? "" : " · closed");
+    $("#ph").textContent = "Present (" + n + ")";
+    $("#toggle").textContent = open ? "Close check-in" : "Reopen check-in";
+    $("#codeCard").hidden = !d.require_code || !open;
+    $("#code").textContent = d.code;
+    left = d.seconds_left;
+
+    $("#list").innerHTML = n
+      ? d.attendees.map(a => `<li><span>${esc(a.name)}</span>
+          <span style="display:flex;gap:10px;align-items:center">
+            <span class="when">${esc(new Date(a.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}</span>
+            <button class="secondary" data-rm="${esc(a.name)}">Remove</button>
+          </span></li>`).join("")
+      : `<li class="muted">Nobody yet.</li>`;
+
+    $("#list").querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => {
+      if (!confirm("Remove " + b.dataset.rm + " from the list?")) return;
+      await rpc("remove_attendee", { p_session: id, p_key: key, p_name: b.dataset.rm });
+      refresh();
+    });
+
+    $("#missCard").hidden = !d.missing.length;
+    $("#miss").innerHTML = d.missing.map(m => `<span class="tag">${esc(m)}</span>`).join("");
   }
-  if(data === 'ok'){
-    attendance[name] = new Date().toISOString();
-    myMarkedName = name;
-    toast("Stamped in as " + name + "!");
-  } else if(data === 'device_already_marked'){
-    toast("This device already stamped in.");
-    await loadAttendance();
-  } else if(data === 'name_already_marked'){
-    toast(name + " is already marked present.");
-    await loadAttendance();
-  } else {
-    toast("That name isn't on the roster.");
-  }
-  render();
+
+  $("#toggle").onclick = async () => {
+    await rpc("set_open", { p_session: id, p_key: key, p_open: !open });
+    refresh();
+  };
+
+  refresh();
+  timers.push(setInterval(refresh, 3000));
+  timers.push(setInterval(() => {
+    left = Math.max(0, left - 1);
+    const bar = $("#bar");
+    if (bar) bar.style.width = (left / 30 * 100) + "%";
+  }, 1000));
 }
 
-loadSession();
+async function exportCsv(id, key) {
+  const d = await rpc("admin_view", { p_session: id, p_key: key });
+  if (d.error) return alert(d.error);
+  const rows = [["name", "checked_in_at"]].concat(
+    d.attendees.map(a => [a.name, new Date(a.at).toLocaleString()]));
+  const csv = "\uFEFF" + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "attendance-" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+/* ── what a classmate opens ─────────────────────────────────────────── */
+async function viewCheckin(id) {
+  app.innerHTML = `<div class="card"><h1 id="t">Loading…</h1><p class="muted" id="s">One moment.</p></div>`;
+  const $ = s => app.querySelector(s);
+  const device = deviceId();
+
+  let state;
+  try { state = await rpc("public_session", { p_session: id, p_device: device }); }
+  catch { $("#t").textContent = "No connection"; $("#s").textContent = "Check your internet and reload."; return; }
+
+  if (state.error) { $("#t").textContent = "Link not valid"; $("#s").textContent = state.error; return; }
+
+  const done = name => {
+    app.innerHTML = `<div class="card"><h1>You're marked present</h1>
+      <p class="muted">Recorded as <strong>${esc(name)}</strong>.</p></div>`;
+  };
+  if (state.already) return done(state.already);
+
+  $("#t").textContent = state.title;
+  if (!state.is_open) { $("#s").textContent = "Check-in is closed for this session."; return; }
+
+  const hasRoster = state.roster.length > 0;
+  $("#s").textContent = hasRoster
+    ? "Tap your name, type the code on the screen, and confirm."
+    : "Enter your name and the code shown on the screen.";
+
+  app.insertAdjacentHTML("beforeend", `
+  <form class="card" id="f" autocomplete="off">
+    ${hasRoster ? `
+      <label for="filter">Find your name</label>
+      <input id="filter" type="search" placeholder="Start typing…">
+      <div class="namelist" id="names"></div>` : `
+      <label for="free">Your full name</label>
+      <input id="free" type="text" autocomplete="name" placeholder="e.g. Alex Ivanov">`}
+    ${state.require_code ? `
+      <label for="code">Code on the screen</label>
+      <input id="code" class="pin" type="text" inputmode="numeric" pattern="[0-9]*"
+             maxlength="4" placeholder="0000" autocomplete="one-time-code">
+      <p class="muted">It changes every 30 seconds, so you have to be in the room to read it.</p>` : ""}
+    <button id="go" type="submit">I'm here</button>
+    <div id="msg" class="msg bad" hidden></div>
+  </form>`);
+
+  let picked = null;
+  const taken = new Set(state.taken.map(n => n.toLowerCase()));
+
+  function drawNames() {
+    const q = $("#filter").value.trim().toLowerCase();
+    const hits = state.roster.filter(n => n.toLowerCase().includes(q)).slice(0, 60);
+    $("#names").innerHTML = hits.length
+      ? hits.map(n => `<button type="button" data-n="${esc(n)}"
+          class="${taken.has(n.toLowerCase()) ? "gone" : ""}"
+          ${taken.has(n.toLowerCase()) ? "disabled" : ""}
+          style="${n === picked ? "border-color:var(--accent)" : ""}">${esc(n)}</button>`).join("")
+      : `<p class="muted">No name matches that.</p>`;
+    $("#names").querySelectorAll("[data-n]").forEach(b => b.onclick = () => {
+      picked = b.dataset.n;
+      drawNames();
+      if ($("#code")) $("#code").focus();
+    });
+  }
+  if (hasRoster) { $("#filter").oninput = drawNames; drawNames(); }
+
+  const say = t => { const m = $("#msg"); m.textContent = t; m.hidden = false; };
+
+  $("#f").onsubmit = async e => {
+    e.preventDefault();
+    const name = hasRoster ? picked : $("#free").value.trim();
+    if (!name) return say("Please choose your name first.");
+    const code = $("#code") ? $("#code").value.trim() : "";
+    if (state.require_code && code.length !== 4) return say("Enter the 4-digit code from the screen.");
+
+    $("#go").disabled = true;
+    $("#msg").hidden = true;
+    try {
+      const out = await rpc("check_in", { p_session: id, p_name: name, p_code: code, p_device: device });
+      if (out.ok) return done(out.name);
+      say(out.error || "Something went wrong. Try again.");
+      // Only strike the name out when it is genuinely taken; a wrong
+      // code must leave the choice intact.
+      if (hasRoster && /already been marked/.test(out.error || "")) {
+        taken.add(name.toLowerCase());
+        picked = null;
+        drawNames();
+      }
+    } catch {
+      say("No connection. Try again.");
+    } finally {
+      $("#go").disabled = false;
+    }
+  };
+}
+
+window.addEventListener("hashchange", render);
+render();
 </script>
-
 </body>
 </html>
