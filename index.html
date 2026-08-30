@@ -35,6 +35,7 @@ textarea{min-height:120px;resize:vertical}
 /* всё крупное: страницу открывают с телефона, одной рукой */
 button{min-height:52px;padding:14px 16px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:650;cursor:pointer}
 button.secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.danger{color:var(--bad);border:1px solid var(--bad);background:transparent}
 button[disabled]{opacity:.5;cursor:not-allowed}
 .row{display:flex;gap:10px}
 .row>*{flex:1}
@@ -51,6 +52,8 @@ ul.people li{display:flex;justify-content:space-between;align-items:center;gap:1
 ul.people li:last-child{border-bottom:0}
 ul.people .when{color:var(--muted);font-size:.82rem;white-space:nowrap}
 ul.people button{width:auto;min-height:36px;padding:6px 12px;font-size:.82rem}
+/* строка сохранённой отметки: широкая кнопка + узкая «Удалить» */
+ul.people button.grow{flex:1;min-width:0;width:100%;min-height:46px;text-align:left;font-size:.9rem;padding:8px 12px}
 .namelist{max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .namelist button{text-align:left;background:var(--bg);color:var(--ink);border:1px solid var(--line);margin-bottom:8px}
 .namelist button.gone{opacity:.45;text-decoration:line-through}
@@ -68,9 +71,9 @@ ul.people button{width:auto;min-height:36px;padding:6px 12px;font-size:.82rem}
 const SUPABASE_URL = "https://dnfrdlcxqwagwnqglxcz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGci••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••";
 
-/* Сколько живёт код на экране. Должно совпадать со значением в SQL-функциях
-   check_in и admin_view. */
-const CODE_PERIOD = 60;
+/* Сколько живёт код на экране, в секундах. Должно совпадать со значением
+   в SQL-функциях check_in и admin_view. */
+const CODE_PERIOD = 180;
 
 const app = document.getElementById("app");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
@@ -105,13 +108,12 @@ async function rpc(fn, args) {
   return data || {};
 }
 
-/* сохранённые ссылки администратора, чтобы вернуться к своей отметке */
+/* Сохранённые ссылки администратора. Живут только в этом браузере —
+   на другом устройстве список будет пустым. */
 const readSaved = () => { try { return JSON.parse(localStorage.getItem("attendance.sessions")) || []; } catch { return []; } };
-function save(entry) {
-  const all = readSaved().filter(s => s.id !== entry.id);
-  all.unshift(entry);
-  try { localStorage.setItem("attendance.sessions", JSON.stringify(all.slice(0, 10))); } catch {}
-}
+const writeSaved = list => { try { localStorage.setItem("attendance.sessions", JSON.stringify(list.slice(0, 20))); } catch {} };
+const save = entry => writeSaved([entry].concat(readSaved().filter(s => s.id !== entry.id)));
+const forget = id => writeSaved(readSaved().filter(s => s.id !== id));
 
 /* ── адреса: #/j/<id> — для одногруппников, #/a/<id>/<key> — для вас ── */
 function route() {
@@ -130,6 +132,13 @@ function render() {
   if (r.view === "checkin") return viewCheckin(r.id);
   if (r.view === "admin") return viewAdmin(r.id, r.key);
   viewCreate();
+}
+
+/* Удаление отметки: сначала из базы, потом из локального списка.
+   Если в базе её уже нет — всё равно убираем из списка, чтобы не залипала. */
+async function deleteSession(s) {
+  try { await rpc("delete_session", { p_session: s.id, p_key: s.key }); } catch {}
+  forget(s.id);
 }
 
 /* ── создание отметки ───────────────────────────────────────────────── */
@@ -157,12 +166,37 @@ function viewCreate() {
       <div id="msg" class="msg bad" hidden></div>
     </form>
   </div>
-  ${saved.length ? `<div class="card"><h2>Ваши прошлые отметки</h2>${
-    saved.map(s => `<button class="secondary" style="margin-bottom:8px"
-      data-go="#/a/${esc(s.id)}/${esc(s.key)}">${esc(s.title)} · ${esc(new Date(s.at).toLocaleString("ru-RU"))}</button>`).join("")
-  }</div>` : ""}`;
+  ${saved.length ? `
+  <div class="card">
+    <h2>Ваши прошлые отметки</h2>
+    <ul class="people">${saved.map(s => `
+      <li>
+        <button class="secondary grow" data-go="#/a/${esc(s.id)}/${esc(s.key)}">${esc(s.title)}<br>
+          <span class="when">${esc(new Date(s.at).toLocaleString("ru-RU"))}</span></button>
+        <button class="danger" data-del="${esc(s.id)}">Удалить</button>
+      </li>`).join("")}</ul>
+    <p class="muted" style="margin-top:14px">«Удалить» стирает отметку и всех отметившихся
+       из базы навсегда, а её ссылка перестаёт работать.</p>
+    <button class="secondary" id="forget">Очистить список на этом устройстве</button>
+  </div>` : ""}`;
 
   app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { location.hash = b.dataset.go; });
+
+  app.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+    const s = readSaved().find(x => x.id === b.dataset.del);
+    if (!s) return;
+    if (!confirm("Удалить отметку «" + s.title + "» вместе со списком отметившихся? Отменить будет нельзя.")) return;
+    b.disabled = true;
+    await deleteSession(s);
+    viewCreate();
+  });
+
+  const forgetBtn = app.querySelector("#forget");
+  if (forgetBtn) forgetBtn.onclick = () => {
+    if (!confirm("Убрать список ссылок с этого устройства? Сами отметки и данные останутся в базе, но вернуться к ним вы сможете только по сохранённой ссылке.")) return;
+    writeSaved([]);
+    viewCreate();
+  };
 
   app.querySelector("#f").onsubmit = async e => {
     e.preventDefault();
@@ -204,7 +238,7 @@ function viewAdmin(id, key) {
     <h2>Покажите этот код аудитории</h2>
     <div class="code" id="code">••••</div>
     <div class="bar"><i id="bar" style="width:100%"></i></div>
-    <p class="muted" style="margin-top:10px">Код меняется каждые 60 секунд. Тот, кого нет
+    <p class="muted" style="margin-top:10px">Код меняется каждые 3 минуты. Тот, кого нет
        в аудитории, отметиться не сможет, даже если у него есть ссылка.</p>
   </div>
   <div class="card">
@@ -217,7 +251,8 @@ function viewAdmin(id, key) {
   <div class="card">
     <p class="muted">Не показывайте адрес этой страницы: это единственный вход в вашу
        отметку, и любой, у кого он есть, сможет менять список.</p>
-    <button class="secondary" id="new">Создать новую отметку</button>
+    <button class="secondary" id="new" style="margin-bottom:10px">Создать новую отметку</button>
+    <button class="danger" id="del">Удалить эту отметку</button>
   </div>`;
 
   const $ = s => app.querySelector(s);
@@ -231,7 +266,16 @@ function viewAdmin(id, key) {
     setTimeout(() => ($("#copy").textContent = "Скопировать ссылку"), 1800);
   };
 
-  let left = CODE_PERIOD, open = true;
+  let left = CODE_PERIOD, open = true, title = "";
+
+  $("#del").onclick = async () => {
+    if (!confirm("Удалить отметку «" + (title || "без названия") + "» вместе со списком отметившихся? Отменить будет нельзя.")) return;
+    $("#del").disabled = true;
+    stopTimers();
+    await deleteSession({ id, key });
+    location.hash = "";
+    render();
+  };
 
   async function refresh() {
     let d;
@@ -240,6 +284,7 @@ function viewAdmin(id, key) {
     if (d.error) { stopTimers(); $("#t").textContent = d.error; return; }
 
     open = d.is_open;
+    title = d.title;
     const n = d.attendees.length;
     $("#t").textContent = d.title;
     $("#count").textContent =
@@ -335,7 +380,7 @@ async function viewCheckin(id) {
       <label for="code">Код с экрана</label>
       <input id="code" class="pin" type="text" inputmode="numeric" pattern="[0-9]*"
              maxlength="4" placeholder="0000" autocomplete="one-time-code">
-      <p class="muted">Он меняется каждую минуту — прочитать его можно только в аудитории.</p>` : ""}
+      <p class="muted">Он меняется каждые 3 минуты — прочитать его можно только в аудитории.</p>` : ""}
     <button id="go" type="submit">Я здесь</button>
     <div id="msg" class="msg bad" hidden></div>
   </form>`);
