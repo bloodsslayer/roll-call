@@ -385,7 +385,9 @@ async function viewCheckin(id) {
     } catch {
       say("Нет связи. Попробуйте ещё раз.");
     } finally {
-      $("#go").disabled = false;
+      // done() уже мог заменить содержимое страницы — кнопки может не быть
+      const go = $("#go");
+      if (go) go.disabled = false;
     }
   };
 }
