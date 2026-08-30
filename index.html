@@ -26,6 +26,8 @@ main{max-width:560px;margin:0 auto}
 h1{font-size:1.4rem;margin:0 0 4px}
 h2{font-size:1.05rem;margin:0 0 10px}
 p{margin:0 0 12px}
+code{font-family:ui-monospace,Menlo,monospace;font-size:.88em;background:var(--bg);
+  border:1px solid var(--line);border-radius:6px;padding:1px 5px}
 .muted{color:var(--muted);font-size:.9rem}
 label{display:block;font-weight:600;font-size:.9rem;margin:14px 0 6px}
 input,textarea,select,button{font:inherit;width:100%;border-radius:10px}
@@ -66,7 +68,7 @@ ul.people button{width:auto;min-height:36px;padding:6px 12px;font-size:.82rem}
 /* Ключ anon и должен быть публичным — держать его в этом файле безопасно.
    Данные защищают правила внутри базы, а не скрытность ключа. */
 const SUPABASE_URL = "https://dnfrdlcxqwagwnqglxcz.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGci••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuZnJkbGN4cXdhZ3ducWdseGN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxMDU2ODMsImV4cCI6MjEwMzY4MTY4M30.paDQoVTsQcQRUbwdRHKSLcKAwVwlA5_3b65-KAwrM5s";
 
 /* Сколько живёт код на экране, в секундах. Должно совпадать со значением
    в SQL-функциях check_in и admin_view. */
@@ -91,17 +93,28 @@ function deviceId() {
 }
 
 async function rpc(fn, args) {
-  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: "Bearer " + SUPABASE_ANON_KEY,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(args)
-  });
+  let r;
+  try {
+    r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: "Bearer " + SUPABASE_ANON_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(args)
+    });
+  } catch (e) {
+    /* Сюда попадают сетевые сбои. Браузер сообщает о них невнятно
+       («Type error», «Failed to fetch»), поэтому объясняем сами. */
+    if (location.protocol === "file:")
+      throw new Error("Страница открыта как файл на диске. В этом режиме браузер запрещает "
+        + "запросы к базе. Откройте сайт по адресу http:// или https:// — например на GitHub Pages.");
+    throw new Error("Не удалось связаться с базой. Проверьте интернет, отключите блокировщик "
+      + "рекламы для этого сайта и убедитесь, что проект Supabase не приостановлен.");
+  }
   const data = await r.json().catch(() => null);
-  if (!r.ok) throw new Error((data && (data.message || data.hint)) || "Не удалось связаться с базой.");
+  if (!r.ok) throw new Error((data && (data.message || data.hint)) || ("Ошибка базы (HTTP " + r.status + ")."));
   return data || {};
 }
 
@@ -126,10 +139,30 @@ const stopTimers = () => { timers.forEach(clearInterval); timers = []; };
 
 function render() {
   stopTimers();
+  /* Две ситуации, в которых не заработает ничего. Лучше сказать об этом
+     прямо, чем показывать невнятную ошибку после нажатия кнопки. */
+  if (SUPABASE_URL.includes("YOUR-PROJECT") || SUPABASE_ANON_KEY.includes("YOUR-ANON"))
+    return viewProblem("Ключи не вставлены",
+      "В начале файла <code>index.html</code> остались заглушки вместо адреса проекта и ключа "
+      + "Supabase. Замените <code>SUPABASE_URL</code> и <code>SUPABASE_ANON_KEY</code> на значения "
+      + "из Supabase → Settings → API.");
+  if (location.protocol === "file:")
+    return viewProblem("Откройте сайт по ссылке, а не файлом",
+      "Сейчас страница открыта как файл на диске (<code>file://</code>), а в этом режиме браузер "
+      + "запрещает запросы к базе — любое действие закончится ошибкой вида «Type error». "
+      + "Загрузите <code>index.html</code> на GitHub Pages и откройте по адресу "
+      + "<code>https://…github.io/…</code>. Для проверки на своём компьютере запустите в папке "
+      + "с файлом команду <code>python3 -m http.server 8000</code> и откройте "
+      + "<code>http://localhost:8000/</code>.");
+
   const r = route();
   if (r.view === "checkin") return viewCheckin(r.id);
   if (r.view === "admin") return viewAdmin(r.id, r.key);
   viewCreate();
+}
+
+function viewProblem(title, html) {
+  app.innerHTML = `<div class="card"><h1>${esc(title)}</h1><p class="muted">${html}</p></div>`;
 }
 
 /* ── создание отметки ───────────────────────────────────────────────── */
@@ -166,15 +199,18 @@ function viewCreate() {
 
   app.querySelector("#f").onsubmit = async e => {
     e.preventDefault();
+    const btn = app.querySelector("#f button[type=submit]");
     const title = app.querySelector("#title").value.trim();
     const seen = new Set(), roster = [];
     for (const line of app.querySelector("#roster").value.split("\n")) {
       const name = line.trim().replace(/\s+/g, " ").slice(0, 60);
       // ё и е — одна буква, как и в базе
-      const key = name.toLowerCase().replace(/ё/g, "е").replace(/[^a-z0-9\u0400-\u04ff]+/g, "");
+      const key = name.toLowerCase().replace(/ё/g, "е").replace(/[^a-z0-9Ѐ-ӿ]+/g, "");
       if (name && key && !seen.has(key)) { seen.add(key); roster.push(name); }
     }
     const msg = app.querySelector("#msg");
+    btn.disabled = true;
+    msg.hidden = true;
     try {
       const out = await rpc("create_session", {
         p_title: title, p_roster: roster, p_require_code: app.querySelector("#needcode").checked
@@ -185,6 +221,7 @@ function viewCreate() {
     } catch (err) {
       msg.textContent = err.message;
       msg.hidden = false;
+      btn.disabled = false;
     }
   };
 }
@@ -228,7 +265,7 @@ function viewAdmin(id, key) {
   $("#copy").onclick = async () => {
     try { await navigator.clipboard.writeText(joinLink); $("#copy").textContent = "Скопировано"; }
     catch { $("#copy").textContent = "Выделите ссылку выше и скопируйте"; }
-    setTimeout(() => ($("#copy").textContent = "Скопировать ссылку"), 1800);
+    setTimeout(() => { const c = $("#copy"); if (c) c.textContent = "Скопировать ссылку"; }, 1800);
   };
 
   let left = CODE_PERIOD, open = true;
@@ -236,7 +273,7 @@ function viewAdmin(id, key) {
   async function refresh() {
     let d;
     try { d = await rpc("admin_view", { p_session: id, p_key: key }); }
-    catch { return; }
+    catch { return; }               // сеть моргнула — попробуем на следующем круге
     if (d.error) { stopTimers(); $("#t").textContent = d.error; return; }
 
     open = d.is_open;
@@ -261,7 +298,8 @@ function viewAdmin(id, key) {
 
     $("#list").querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => {
       if (!confirm("Убрать из списка: " + b.dataset.rm + "?")) return;
-      await rpc("remove_attendee", { p_session: id, p_key: key, p_name: b.dataset.rm });
+      try { await rpc("remove_attendee", { p_session: id, p_key: key, p_name: b.dataset.rm }); }
+      catch (err) { alert(err.message); }
       refresh();
     });
 
@@ -270,7 +308,8 @@ function viewAdmin(id, key) {
   }
 
   $("#toggle").onclick = async () => {
-    await rpc("set_open", { p_session: id, p_key: key, p_open: !open });
+    try { await rpc("set_open", { p_session: id, p_key: key, p_open: !open }); }
+    catch (err) { alert(err.message); }
     refresh();
   };
 
@@ -284,11 +323,13 @@ function viewAdmin(id, key) {
 }
 
 async function exportCsv(id, key) {
-  const d = await rpc("admin_view", { p_session: id, p_key: key });
+  let d;
+  try { d = await rpc("admin_view", { p_session: id, p_key: key }); }
+  catch (err) { return alert(err.message); }
   if (d.error) return alert(d.error);
   const rows = [["Имя", "Время отметки"]].concat(
     d.attendees.map(a => [a.name, new Date(a.at).toLocaleString("ru-RU")]));
-  const csv = "\uFEFF" + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+  const csv = "﻿" + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   const a = document.createElement("a");
   a.href = url;
@@ -305,7 +346,7 @@ async function viewCheckin(id) {
 
   let state;
   try { state = await rpc("public_session", { p_session: id, p_device: device }); }
-  catch { $("#t").textContent = "Нет связи"; $("#s").textContent = "Проверьте интернет и обновите страницу."; return; }
+  catch (err) { $("#t").textContent = "Не открывается"; $("#s").textContent = err.message; return; }
 
   if (state.error) { $("#t").textContent = "Ссылка не работает"; $("#s").textContent = state.error; return; }
 
@@ -360,7 +401,7 @@ async function viewCheckin(id) {
   }
   if (hasRoster) { $("#filter").oninput = drawNames; drawNames(); }
 
-  const say = t => { const m = $("#msg"); m.textContent = t; m.hidden = false; };
+  const say = t => { const m = $("#msg"); if (m) { m.textContent = t; m.hidden = false; } };
 
   $("#f").onsubmit = async e => {
     e.preventDefault();
@@ -382,8 +423,8 @@ async function viewCheckin(id) {
         picked = null;
         drawNames();
       }
-    } catch {
-      say("Нет связи. Попробуйте ещё раз.");
+    } catch (err) {
+      say(err.message);
     } finally {
       // done() уже мог заменить содержимое страницы — кнопки может не быть
       const go = $("#go");
