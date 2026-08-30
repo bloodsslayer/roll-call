@@ -63,13 +63,14 @@ ul.people button{width:auto;min-height:36px;padding:6px 12px;font-size:.82rem}
 <main id="app"></main>
 
 <script>
-/* ══ 1. ВСТАВЬТЕ СЮДА ДВА ЗНАЧЕНИЯ ИЗ SUPABASE ══════════════════════════
-   Settings → API в вашем проекте Supabase.
-   Ключ anon и должен быть публичным — держать его в этом файле безопасно,
-   данные защищают правила в самой базе, а не скрытность ключа.          */
+/* Ключ anon и должен быть публичным — держать его в этом файле безопасно.
+   Данные защищают правила внутри базы, а не скрытность ключа. */
 const SUPABASE_URL = "https://dnfrdlcxqwagwnqglxcz.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuZnJkbGN4cXdhZ3ducWdseGN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxMDU2ODMsImV4cCI6MjEwMzY4MTY4M30.paDQoVTsQcQRUbwdRHKSLcKAwVwlA5_3b65-KAwrM5s";
-/* ══════════════════════════════════════════════════════════════════════ */
+const SUPABASE_ANON_KEY = "eyJhbGci••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••";
+
+/* Сколько живёт код на экране. Должно совпадать со значением в SQL-функциях
+   check_in и admin_view. */
+const CODE_PERIOD = 60;
 
 const app = document.getElementById("app");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
@@ -125,23 +126,10 @@ const stopTimers = () => { timers.forEach(clearInterval); timers = []; };
 
 function render() {
   stopTimers();
-  if (SUPABASE_URL.includes("YOUR-PROJECT")) return viewSetup();
   const r = route();
   if (r.view === "checkin") return viewCheckin(r.id);
   if (r.view === "admin") return viewAdmin(r.id, r.key);
   viewCreate();
-}
-
-/* ── ключи ещё не вставлены ─────────────────────────────────────────── */
-function viewSetup() {
-  app.innerHTML = `<div class="card">
-    <h1>Почти готово</h1>
-    <p>Откройте <code>index.html</code> и замените <code>SUPABASE_URL</code> и
-       <code>SUPABASE_ANON_KEY</code> в начале скрипта на значения из вашего проекта
-       Supabase (Settings → API). Затем обновите эту страницу.</p>
-    <p class="muted">Если вы ещё не выполнили SQL-настройку в Supabase, начните с неё —
-       без таблиц и функций ничего работать не будет.</p>
-  </div>`;
 }
 
 /* ── создание отметки ───────────────────────────────────────────────── */
@@ -216,7 +204,7 @@ function viewAdmin(id, key) {
     <h2>Покажите этот код аудитории</h2>
     <div class="code" id="code">••••</div>
     <div class="bar"><i id="bar" style="width:100%"></i></div>
-    <p class="muted" style="margin-top:10px">Код меняется каждые 30 секунд. Тот, кого нет
+    <p class="muted" style="margin-top:10px">Код меняется каждые 60 секунд. Тот, кого нет
        в аудитории, отметиться не сможет, даже если у него есть ссылка.</p>
   </div>
   <div class="card">
@@ -243,7 +231,7 @@ function viewAdmin(id, key) {
     setTimeout(() => ($("#copy").textContent = "Скопировать ссылку"), 1800);
   };
 
-  let left = 30, open = true;
+  let left = CODE_PERIOD, open = true;
 
   async function refresh() {
     let d;
@@ -287,11 +275,11 @@ function viewAdmin(id, key) {
   };
 
   refresh();
-  timers.push(setInterval(refresh, 6000));
+  timers.push(setInterval(refresh, 3000));
   timers.push(setInterval(() => {
     left = Math.max(0, left - 1);
     const bar = $("#bar");
-    if (bar) bar.style.width = (left / 30 * 100) + "%";
+    if (bar) bar.style.width = (left / CODE_PERIOD * 100) + "%";
   }, 1000));
 }
 
@@ -347,7 +335,7 @@ async function viewCheckin(id) {
       <label for="code">Код с экрана</label>
       <input id="code" class="pin" type="text" inputmode="numeric" pattern="[0-9]*"
              maxlength="4" placeholder="0000" autocomplete="one-time-code">
-      <p class="muted">Он меняется каждые 30 секунд — прочитать его можно только в аудитории.</p>` : ""}
+      <p class="muted">Он меняется каждую минуту — прочитать его можно только в аудитории.</p>` : ""}
     <button id="go" type="submit">Я здесь</button>
     <div id="msg" class="msg bad" hidden></div>
   </form>`);
